@@ -194,14 +194,19 @@ export class ContentAnalyzer {
     }
 
     /**
-     * Detects issues in the analyzed page
+     * Detects issues in the analyzed page (Phase 5 enhanced)
      * @param {Array} sections - Array of analyzed sections
      * @param {Array} headingHierarchy - Heading hierarchy
      * @param {Object} metadata - Page metadata
+     * @param {CheerioStatic} $ - Cheerio instance for DOM inspection
      * @returns {Array} Array of identified issues
      */
-    static detectIssues(sections, headingHierarchy, metadata) {
+    static detectIssues(sections, headingHierarchy, metadata, $ = null) {
         const issues = [];
+
+        // =====================================================================
+        // Accessibility Issues (Phase 3 + Phase 5 enhanced)
+        // =====================================================================
 
         // Check for missing h1
         const hasH1 = headingHierarchy.some((h) => h.level === 1);
@@ -228,6 +233,63 @@ export class ContentAnalyzer {
             }
         }
 
+        // Phase 5: Check for missing alt text on images
+        if ($) {
+            const $images = $('img');
+            const imagesWithoutAlt = [];
+            $images.each((_, img) => {
+                const $img = $(img);
+                const alt = $img.attr('alt');
+                const src = $img.attr('src') || 'unknown';
+                if (alt === undefined || alt === null || alt.trim() === '') {
+                    imagesWithoutAlt.push(src.substring(0, 50)); // Truncate long URLs
+                }
+            });
+
+            if (imagesWithoutAlt.length > 0) {
+                issues.push({
+                    type: 'accessibility',
+                    severity: 'medium',
+                    description: `${imagesWithoutAlt.length} image(s) missing alt text - impacts screen reader accessibility`,
+                    location: imagesWithoutAlt.length <= 3 ? `Images: ${imagesWithoutAlt.join(', ')}` : undefined,
+                });
+            }
+        }
+
+        // Phase 5: Check for poor semantic HTML usage
+        if ($) {
+            const $main = $('main');
+            const $header = $('header');
+            const $footer = $('footer');
+            const $nav = $('nav');
+
+            const semanticIssues = [];
+            if ($main.length === 0) {
+                semanticIssues.push('No <main> element found');
+            }
+            if ($header.length === 0 && $('body [class*="header"], body [id*="header"]').length > 0) {
+                semanticIssues.push('Header area not using <header> element');
+            }
+            if ($footer.length === 0 && $('body [class*="footer"], body [id*="footer"]').length > 0) {
+                semanticIssues.push('Footer area not using <footer> element');
+            }
+            if ($nav.length === 0 && $('body [class*="nav"], body [id*="nav"]').length > 0) {
+                semanticIssues.push('Navigation not using <nav> element');
+            }
+
+            if (semanticIssues.length > 0) {
+                issues.push({
+                    type: 'accessibility',
+                    severity: 'low',
+                    description: `Poor semantic HTML: ${semanticIssues.join('; ')}`,
+                });
+            }
+        }
+
+        // =====================================================================
+        // Responsiveness Issues (Phase 3)
+        // =====================================================================
+
         // Check for missing viewport
         if (!metadata.viewport) {
             issues.push({
@@ -236,6 +298,20 @@ export class ContentAnalyzer {
                 description: 'Missing viewport meta tag - page may not render correctly on mobile devices',
             });
         }
+
+        // Phase 5: Enhanced mobile responsiveness check
+        if (metadata.viewport && !/width\s*=\s*device-width/.test(metadata.viewport)) {
+            issues.push({
+                type: 'responsiveness',
+                severity: 'medium',
+                description: 'Viewport does not include device-width - may cause mobile rendering issues',
+                location: `Current viewport: "${metadata.viewport}"`,
+            });
+        }
+
+        // =====================================================================
+        // UX Issues (Phase 3 + Phase 5 enhanced)
+        // =====================================================================
 
         // Check for excessive content density
         const highDensitySections = sections.filter((s) => s.contentDensity > 80);
@@ -247,6 +323,18 @@ export class ContentAnalyzer {
             });
         }
 
+        // Phase 5: Enhanced - Check for very low content density (empty sections)
+        const emptyOrLowContentSections = sections.filter(
+            (s) => s.type !== 'navigation' && s.type !== 'footer' && s.contentDensity < 10 && s.contentLength > 0
+        );
+        if (emptyOrLowContentSections.length > 0) {
+            issues.push({
+                type: 'ux',
+                severity: 'low',
+                description: `${emptyOrLowContentSections.length} section(s) have very low content density - may appear sparse or incomplete`,
+            });
+        }
+
         // Check for missing CTAs
         const hasCTAs = sections.some((s) => s.callsToAction && s.callsToAction.length > 0);
         if (!hasCTAs) {
@@ -254,6 +342,16 @@ export class ContentAnalyzer {
                 type: 'ux',
                 severity: 'medium',
                 description: 'No clear call-to-action elements detected - may impact conversion',
+            });
+        }
+
+        // Phase 5: Check for excessive CTAs (can be overwhelming)
+        const totalCTAs = sections.reduce((sum, s) => sum + (s.callsToAction?.length || 0), 0);
+        if (totalCTAs > 10) {
+            issues.push({
+                type: 'ux',
+                severity: 'low',
+                description: `${totalCTAs} call-to-action elements detected - may overwhelm users and reduce effectiveness`,
             });
         }
 

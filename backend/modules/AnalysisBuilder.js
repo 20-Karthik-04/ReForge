@@ -75,8 +75,8 @@ export class AnalysisBuilder {
         // Step 5: Calculate overall metrics
         const metrics = ContentAnalyzer.calculateMetrics(analyzedSections, metadata);
 
-        // Step 6: Detect issues
-        const issues = ContentAnalyzer.detectIssues(analyzedSections, headingHierarchy, metadata);
+        // Step 6: Detect issues (Phase 5 enhanced - pass $ for DOM inspection)
+        const issues = ContentAnalyzer.detectIssues(analyzedSections, headingHierarchy, metadata, $);
 
         // Step 7: Build final analysis object
         const analysis = {
