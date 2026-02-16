@@ -8,15 +8,15 @@ This document outlines the complete development plan for the ReForge AI-assisted
 
 ### 1.1 Project Initialization
 - [ ] Initialize Node.js project with `package.json`
-- [ ] Set up TypeScript configuration with strict mode
-- [ ] Configure ESLint and Prettier for code quality
+- [ ] Configure ESLint and Prettier for code quality (JavaScript ES6+)
 - [ ] Create `.gitignore` with appropriate Node.js and IDE exclusions
 - [ ] Set up project directory structure:
   - `/backend` - Express API and crawling logic
   - `/frontend` - React UI
   - `/templates` - Predefined React component templates
-  - `/shared` - Shared types and utilities
+  - `/shared` - Shared schemas and utilities
   - `/docs` - Documentation (PRD, Design, API specs)
+- [ ] Ensure project uses Node.js LTS and ES module or CommonJS consistently
 
 ### 1.2 Backend Dependencies Installation
 - [ ] Install Express.js for API layer
@@ -26,16 +26,16 @@ This document outlines the complete development plan for the ReForge AI-assisted
 - [ ] Install dotenv for environment configuration
 - [ ] Install CORS middleware
 - [ ] Install body-parser for JSON parsing
-- [ ] Install TypeScript types for all dependencies
+- [ ] Install Zod for runtime schema validation
 
 ### 1.3 Frontend Dependencies Installation
-- [ ] Initialize React app with Vite or Create React App
+- [ ] Initialize React app with Vite or Create React App (JavaScript configuration)
 - [ ] Install Tailwind CSS and configure
 - [ ] Install React Router for navigation
 - [ ] Install Axios for API calls
 - [ ] Install UI component library or utilities (optional: Headless UI, Radix UI)
 - [ ] Install file-saver for ZIP download functionality
-- [ ] Install TypeScript types for all dependencies
+- [ ] Install PropTypes for component prop validation
 
 ### 1.4 Development Environment Configuration
 - [ ] Create `.env.example` with required environment variables
@@ -45,56 +45,59 @@ This document outlines the complete development plan for the ReForge AI-assisted
 
 ---
 
-## Phase 2: Shared Type Definitions & Contracts
+## Phase 2: Shared Data Contracts & Validation Schemas
 
 ### 2.1 Core Data Structures
-- [ ] Define `WebPageAnalysis` interface representing extracted webpage structure:
+- [ ] Define `WebPageAnalysis` schema using JSDoc and runtime validation:
   - Section types (hero, features, testimonials, pricing, etc.)
   - Content length indicators
   - Layout signals
   - Identified issues
-- [ ] Define `ReferenceAnalysis` interface for reference website data:
+- [ ] Define `ReferenceAnalysis` schema for reference website data:
   - Layout patterns
   - Section ordering
   - Visual structure (without content)
-- [ ] Define `RedesignGoals` enum/type:
+- [ ] Define `RedesignGoals` constants object:
   - Modern design
   - Improved conversion
   - Mobile responsiveness
   - Enhanced accessibility
   - Cleaner layout
+- [ ] **Note**: Use Zod to validate all data structures at runtime
 
 ### 2.2 AI Interaction Contracts
-- [ ] Define `AIRedesignPlan` interface for AI output:
+- [ ] Define `AIRedesignPlan` schema for AI output with validation:
   - Recommended section ordering
   - Suggested layout variants (centered, split, grid)
   - Content tone and emphasis
   - Missing or redundant sections
   - Component mapping instructions
-- [ ] Define `AIPromptInput` interface:
+- [ ] Define `AIPromptInput` schema:
   - Target website analysis
   - Optional reference analysis
   - User redesign goals
   - Constraints and context
+- [ ] **Critical**: Implement strict runtime validation of AI responses to ensure type safety
 
 ### 2.3 Code Generation Contracts
-- [ ] Define `SectionTemplate` interface:
+- [ ] Define `SectionTemplate` schema with validation:
   - Template ID
   - Component name
   - Props schema
   - Variant types
-- [ ] Define `GeneratedOutput` interface:
+- [ ] Define `GeneratedOutput` schema:
   - React component code
   - File structure
   - Dependencies list
   - Preview metadata
 
-### 2.4 API Request/Response Types
-- [ ] Define `/api/analyze` request and response types
-- [ ] Define `/api/reference-analyze` request and response types
-- [ ] Define `/api/generate-plan` request and response types
-- [ ] Define `/api/generate-code` request and response types
-- [ ] Define `/api/preview` request and response types
+### 2.4 API Request/Response Schemas
+- [ ] Define `/api/analyze` request and response schemas with validation
+- [ ] Define `/api/reference-analyze` request and response schemas
+- [ ] Define `/api/generate-plan` request and response schemas
+- [ ] Define `/api/generate-code` request and response schemas
+- [ ] Define `/api/preview` request and response schemas
+- [ ] Document all schemas with JSDoc comments for developer clarity
 
 ---
 
@@ -265,8 +268,9 @@ This document outlines the complete development plan for the ReForge AI-assisted
 ### 7.1 Template Architecture
 - [ ] Define template naming conventions
 - [ ] Create base template structure
-- [ ] Implement props interface for each template type
+- [ ] Define PropTypes for each template component
 - [ ] Define variant system for templates
+- [ ] Document expected props with JSDoc comments
 
 ### 7.2 Navigation Header Templates
 - [ ] Create `NavHeader` template with variants:
@@ -386,7 +390,7 @@ This document outlines the complete development plan for the ReForge AI-assisted
 - [ ] Assemble components in recommended order
 
 ### 8.3 Page Structure Generation
-- [ ] Create main `App.tsx` file structure
+- [ ] Create main `App.jsx` file structure
 - [ ] Import selected templates
 - [ ] Compose page layout from selected sections
 - [ ] Add routing structure (if multi-page support later)
@@ -404,9 +408,9 @@ This document outlines the complete development plan for the ReForge AI-assisted
 
 ### 8.6 File Structure Generation
 - [ ] Create organized file structure:
-  - `/src/components` - Generated components
-  - `/src/App.tsx` - Main application
-  - `/src/index.tsx` - Entry point
+  - `/src/components` - Generated components (JSX files)
+  - `/src/App.jsx` - Main application
+  - `/src/index.jsx` - Entry point
   - `/src/index.css` - Tailwind imports and global styles
   - `/public` - Assets
 - [ ] Generate `README.md` with setup instructions
@@ -421,11 +425,12 @@ This document outlines the complete development plan for the ReForge AI-assisted
 ## Phase 9: Backend - API Endpoints
 
 ### 9.1 API Server Setup
-- [ ] Create Express app with TypeScript
+- [ ] Create Express app with JavaScript (ES6+)
 - [ ] Configure CORS for frontend access
 - [ ] Set up body-parser for JSON
 - [ ] Add request logging middleware
 - [ ] Implement error handling middleware
+- [ ] Add runtime validation middleware for all endpoints
 
 ### 9.2 POST /api/analyze Endpoint
 - [ ] Accept request body: `{ url: string }`
@@ -802,10 +807,13 @@ This document outlines the complete development plan for the ReForge AI-assisted
 - Each task should be implemented and tested before moving to the next
 - Maintain strict separation: AI for planning, deterministic code for generation
 - Never allow AI to generate JSX or CSS directly
-- Always validate AI outputs against schemas
+- **Always validate AI outputs against schemas using runtime validation (Zod)**
+- Since this is a JavaScript project, use JSDoc extensively for documentation and developer clarity
+- Implement PropTypes for all React components to catch prop errors during development
 - Prioritize code quality and maintainability
 - Document decisions and trade-offs
 - Keep user privacy and security as top priorities
+- All data contracts must be validated at runtime to ensure type safety without TypeScript
 
 ---
 

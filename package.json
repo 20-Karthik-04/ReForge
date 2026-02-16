@@ -1,0 +1,51 @@
+{
+  "name": "reforge",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "This project analyzes an existing webpage and generates a modern, optimized frontend using AI-assisted redesign planning and deterministic template-based code generation.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "nodemon backend/server.js",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "npm run build:frontend",
+    "build:frontend": "cd frontend && npm run build",
+    "lint": "eslint backend shared --ext .js",
+    "lint:fix": "eslint backend shared --ext .js --fix",
+    "format": "prettier --write \"backend/**/*.js\" \"shared/**/*.js\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/20-Karthik-04/ReForge.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/20-Karthik-04/ReForge/issues"
+  },
+  "homepage": "https://github.com/20-Karthik-04/ReForge#readme",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "concurrently": "^9.2.1",
+    "eslint": "^10.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "nodemon": "^3.1.11",
+    "playwright": "^1.58.2",
+    "prettier": "^3.8.1"
+  },
+  "dependencies": {
+    "axios": "^1.13.5",
+    "body-parser": "^2.2.2",
+    "cheerio": "^1.2.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "zod": "^4.3.6"
+  }
+}

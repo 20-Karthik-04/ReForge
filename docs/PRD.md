@@ -206,6 +206,7 @@ It:
 - Generates clean, readable, and reusable frontend source code
 
 The code generation process is fully deterministic, meaning the same input always produces the same output.
+In the absence of compile-time typing, the system enforces strict runtime validation and schema checks for all structured data and AI-generated outputs.
 
 ---
 
@@ -243,11 +244,12 @@ The output is designed to be directly deployable or customizable by developers.
 
 - React
 - Tailwind CSS
-- TypeScript
+- JavaScript (ES6+)
 
 **Backend:**
 
 - Node.js
+- JavaScript (ES6+)
 - Express.js (API layer)
 - Cheerio for HTML parsing
 - Playwright (optional, for JavaScript-heavy pages)
