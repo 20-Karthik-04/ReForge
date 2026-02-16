@@ -8,12 +8,9 @@ import {
     ReferenceAnalysisSchema,
     RedesignGoals,
     RedesignGoalSchema,
-    AIRedesignPlanSchema,
     AIPromptInputSchema,
-    SectionTemplateSchema,
     GeneratedOutputSchema,
     AnalyzeRequestSchema,
-    validateOrThrow,
     validateSafe,
     validateWebPageAnalysis,
     validateAIRedesignPlan,
@@ -234,14 +231,14 @@ try {
 console.log('\nTest 8: API Request Schema (AnalyzeRequest)');
 try {
     const validRequest = { url: 'https://example.com' };
-    const parsed = AnalyzeRequestSchema.parse(validRequest);
+    AnalyzeRequestSchema.parse(validRequest);
     console.log('✅ Valid AnalyzeRequest parsed successfully');
 
     // Test invalid URL
     try {
         AnalyzeRequestSchema.parse({ url: 'not-a-url' });
         console.log('❌ Should have rejected invalid URL');
-    } catch (err) {
+    } catch {
         console.log('✅ Correctly rejected invalid URL');
     }
 } catch (error) {
