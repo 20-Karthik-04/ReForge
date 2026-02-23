@@ -204,8 +204,16 @@ export const AIRedesignPlanSchema = z.object({
             sectionType: z.string(),
             templateId: z.string(),
             variant: z.string(),
+            /** Optional props passed through to the code generator */
+            props: z.record(z.string(), z.any()).optional(),
         })
     ),
+    /**
+     * Optional override props per section type.
+     * When present, takes precedence over componentMappings[].props for the same section.
+     * Used by buildRenderPlan (CodeGenerator) to inject template props.
+     */
+    sectionProps: z.record(z.string(), z.record(z.string(), z.any())).optional(),
 });
 
 /**
