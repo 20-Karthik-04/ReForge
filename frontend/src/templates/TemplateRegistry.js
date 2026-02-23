@@ -52,7 +52,7 @@ import Footer from './Footer/Footer.jsx';
  */
 export const TEMPLATE_REGISTRY = {
     /** 7.2 — Navigation header */
-    nav: {
+    navigation: {
         component: NavHeader,
         variants: VARIANTS.NavHeader,
         requiredProps: ['logoText', 'navLinks'],

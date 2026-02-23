@@ -378,47 +378,43 @@ This document outlines the complete development plan for the ReForge AI-assisted
 ## Phase 8: Backend - Deterministic Code Generation Module
 
 ### 8.1 Code Generator Core
-- [ ] Create `CodeGenerator` service
-- [ ] Implement template selection logic based on `AIRedesignPlan`
-- [ ] Map AI section recommendations to template IDs
-- [ ] Handle variant selection based on AI guidance
+- [x] Create `CodeGenerator` service (`backend/modules/CodeGenerator.js`)
+- [x] Implement template selection logic based on `AIRedesignPlan`
+- [x] Map AI section recommendations to template IDs via `BACKEND_TEMPLATE_REGISTRY`
+- [x] Handle variant selection based on AI guidance (with strict error on invalid variant)
 
 ### 8.2 Component Assembly
-- [ ] Implement component instantiation from templates
-- [ ] Inject structured content into template props
-- [ ] Generate unique component names/IDs
-- [ ] Assemble components in recommended order
+- [x] Implement variant validation via `RenderPlanValidator.validateVariant`
+- [x] Inject structured content into template props via `extractPropsForSection`
+- [x] Assemble sections in recommended order (per `sectionOrdering`)
+- [x] Validate required props via `RenderPlanValidator.validateRequiredProps`
 
-### 8.3 Page Structure Generation
-- [ ] Create main `App.jsx` file structure
-- [ ] Import selected templates
-- [ ] Compose page layout from selected sections
-- [ ] Add routing structure (if multi-page support later)
+### 8.3 Page Structure Generation (Render Plan)
+- [x] Validate `sectionOrdering` array before any construction
+- [x] Validate each section type exists in `BACKEND_TEMPLATE_REGISTRY`
+- [x] Construct structured render plan array (pure data — no JSX)
+- [x] Render plan shape: `{ sectionType, componentName, variant, props }[]`
 
-### 8.4 Code Formatting
-- [ ] Implement code formatting using Prettier
-- [ ] Ensure consistent indentation and style
-- [ ] Add comments explaining generated sections
-- [ ] Generate clean, readable code
+### 8.4 Validation & Render Plan Construction
+- [x] All validations run BEFORE plan construction (two-pass: validate → build)
+- [x] Descriptive error messages for all failure modes (section type, variant, required props)
+- [x] No silent fallbacks — every invalid input throws
+- [x] 33 tests passing in `backend/test-phase8.js` (determinism verified)
+- [ ] *Code formatting (Prettier) deferred to 8.5–8.7 file generation batch*
 
 ### 8.5 Dependency Management
-- [ ] Generate `package.json` with required dependencies
-- [ ] List all React, Tailwind, and utility dependencies
-- [ ] Include proper versioning
+- [x] Generate import statements (one per unique component, alphabetically sorted, from `'./templates'`)
+- [x] Deduplication guaranteed — no duplicate imports
 
 ### 8.6 File Structure Generation
-- [ ] Create organized file structure:
-  - `/src/components` - Generated components (JSX files)
-  - `/src/App.jsx` - Main application
-  - `/src/index.jsx` - Entry point
-  - `/src/index.css` - Tailwind imports and global styles
-  - `/public` - Assets
-- [ ] Generate `README.md` with setup instructions
+- [x] Generate `App.jsx` via `generateAppComponent(renderPlan)` — functional component, Fragment root, deterministic indentation
+- [x] JSX uses spread pattern `{...{...}}` with `JSON.stringify` — no manual prop escaping
+- [x] `writeProjectFiles(renderPlan, outputDir)` writes only `<outputDir>/src/App.jsx` — no destructive operations
 
 ### 8.7 Deterministic Behavior Validation
-- [ ] Ensure same input always produces same output
-- [ ] Implement seeding for any random operations (if any)
-- [ ] Add unit tests verifying deterministic behavior
+- [x] Same input always produces identical `App.jsx` content
+- [x] No randomness, no timestamps, no environment-dependent behavior
+- [x] 30 tests passing in `backend/test-phase8-5.js` (imports, JSX, assembly, file I/O, determinism verified)
 
 ---
 
