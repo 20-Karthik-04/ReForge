@@ -356,6 +356,18 @@ export const GenerateCodeResponseSchema = z.object({
     output: GeneratedOutputSchema,
 });
 
+// POST /api/generate-zip
+export const GenerateZipRequestSchema = z.object({
+    generatedOutput: GeneratedOutputSchema,
+});
+
+// POST /api/generate-full
+export const GenerateFullRequestSchema = z.object({
+    url: z.string().url(),
+    referenceUrl: z.string().url().optional(),
+    goals: z.array(RedesignGoalSchema).min(1),
+});
+
 // POST /api/preview
 export const PreviewRequestSchema = z.object({
     generatedOutput: GeneratedOutputSchema,

@@ -64,7 +64,77 @@ function isBlockedIPv6(ip) {
 }
 
 // ---------------------------------------------------------------------------
-// Middleware
+// Pure SSRF check helper (exported for reuse in routes with multiple URLs)
+// ---------------------------------------------------------------------------
+
+/**
+ * Validates a single URL against SSRF rules.
+ *
+ * Resolves the hostname via real DNS and rejects if the resolved IP falls in a
+ * private or reserved range.  Throws a structured error (with statusCode + code)
+ * on violation so callers can forward it directly to Express's next().
+ *
+ * @param {string} url - URL string to validate
+ * @returns {Promise<void>} Resolves if the URL is safe
+ * @throws {{ message: string, statusCode: number, code: string }} On violation
+ */
+export async function checkSsrf(url) {
+    // ── 1. Parse URL ─────────────────────────────────────────────────────────
+    let parsed;
+    try {
+        parsed = new URL(url);
+    } catch {
+        const err = new Error('Invalid URL format');
+        err.statusCode = 400;
+        err.code = 'INVALID_URL';
+        throw err;
+    }
+
+    // ── 2. Protocol check — only http and https allowed ─────────────────────
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        const err = new Error(`Disallowed URL protocol: ${parsed.protocol}. Only http and https are allowed.`);
+        err.statusCode = 400;
+        err.code = 'DISALLOWED_PROTOCOL';
+        throw err;
+    }
+
+    const hostname = parsed.hostname;
+
+    // ── 3. Explicit localhost string check (before DNS) ──────────────────────
+    if (hostname === 'localhost') {
+        const err = new Error('Requests to localhost are not allowed');
+        err.statusCode = 400;
+        err.code = 'SSRF_BLOCKED';
+        throw err;
+    }
+
+    // ── 4. DNS resolution — resolve to actual IP ─────────────────────────────
+    let resolvedAddress;
+    try {
+        const result = await dns.lookup(hostname);
+        resolvedAddress = result.address;
+    } catch {
+        const err = new Error(`Failed to resolve hostname: ${hostname}`);
+        err.statusCode = 400;
+        err.code = 'DNS_RESOLUTION_FAILED';
+        throw err;
+    }
+
+    // ── 5. Check resolved IP for private/reserved ranges ─────────────────────
+    const isBlocked =
+        isBlockedIPv4(resolvedAddress) ||
+        isBlockedIPv6(resolvedAddress);
+
+    if (isBlocked) {
+        const err = new Error(`Requests to private or reserved IP addresses are not allowed (resolved: ${resolvedAddress})`);
+        err.statusCode = 400;
+        err.code = 'SSRF_BLOCKED';
+        throw err;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Middleware (thin wrapper around checkSsrf — existing consumers unchanged)
 // ---------------------------------------------------------------------------
 
 /**
@@ -81,62 +151,12 @@ function isBlockedIPv6(ip) {
  * @param {import('express').NextFunction} next
  */
 export async function ssrfGuard(req, res, next) {
-    const { url } = req.body;
-
-    // ── 1. Parse URL (Zod already validated format, this extracts parts) ────
-    let parsed;
     try {
-        parsed = new URL(url);
-    } catch {
-        const err = new Error('Invalid URL format');
-        err.statusCode = 400;
-        err.code = 'INVALID_URL';
+        await checkSsrf(req.body.url);
+        return next();
+    } catch (err) {
         return next(err);
     }
-
-    // ── 2. Protocol check — only http and https allowed ─────────────────────
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        const err = new Error(`Disallowed URL protocol: ${parsed.protocol}. Only http and https are allowed.`);
-        err.statusCode = 400;
-        err.code = 'DISALLOWED_PROTOCOL';
-        return next(err);
-    }
-
-    const hostname = parsed.hostname;
-
-    // ── 3. Explicit localhost string check (before DNS) ──────────────────────
-    if (hostname === 'localhost') {
-        const err = new Error('Requests to localhost are not allowed');
-        err.statusCode = 400;
-        err.code = 'SSRF_BLOCKED';
-        return next(err);
-    }
-
-    // ── 4. DNS resolution — resolve to actual IP ─────────────────────────────
-    let resolvedAddress;
-    try {
-        const result = await dns.lookup(hostname);
-        resolvedAddress = result.address;
-    } catch (dnsErr) {
-        const err = new Error(`Failed to resolve hostname: ${hostname}`);
-        err.statusCode = 400;
-        err.code = 'DNS_RESOLUTION_FAILED';
-        return next(err);
-    }
-
-    // ── 5. Check resolved IP for private/reserved ranges ─────────────────────
-    const isBlocked =
-        isBlockedIPv4(resolvedAddress) ||
-        isBlockedIPv6(resolvedAddress);
-
-    if (isBlocked) {
-        const err = new Error(`Requests to private or reserved IP addresses are not allowed (resolved: ${resolvedAddress})`);
-        err.statusCode = 400;
-        err.code = 'SSRF_BLOCKED';
-        return next(err);
-    }
-
-    return next();
 }
 
 export default ssrfGuard;

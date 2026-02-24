@@ -10,7 +10,7 @@
  */
 
 import PropTypes from 'prop-types';
-import { cn, resolveVariant } from '../templateUtils.js';
+import { resolveVariant } from '../templateUtils.js';
 import FeatureCard from './FeatureCard.jsx';
 
 // ---------------------------------------------------------------------------

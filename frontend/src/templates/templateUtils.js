@@ -72,11 +72,13 @@ export function getDefaultVariant(componentName) {
 export function resolveVariant(componentName, variant) {
     const allowed = VARIANTS[componentName];
     if (!allowed) {
+        // eslint-disable-next-line no-console
         console.warn(`[templateUtils] Unknown component "${componentName}". Returning variant as-is.`);
         return variant;
     }
     if (!allowed.includes(variant)) {
         const fallback = allowed[0];
+        // eslint-disable-next-line no-console
         console.warn(
             `[templateUtils] Invalid variant "${variant}" for ${componentName}. ` +
             `Expected one of: [${allowed.join(', ')}]. Falling back to "${fallback}".`
