@@ -18,7 +18,7 @@ import PropTypes from 'prop-types';
 function Card({ children, className = '' }) {
     return (
         <div
-            className={`rounded-card bg-white p-6 shadow-card ${className}`.trim()}
+            className={`rounded-card bg-white p-6 shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-card-hover ${className}`.trim()}
         >
             {children}
         </div>

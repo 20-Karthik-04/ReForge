@@ -509,20 +509,29 @@ This document outlines the complete development plan for the ReForge AI-assisted
 
 ## Phase 11: Frontend - Main Application Pages
 
+### 11.0 React Router Setup
+- [x] Install react-router-dom (already present v7.13.0)
+- [x] Create `src/layouts/AppLayout.jsx` (sticky header + footer shell)
+- [x] Update `App.jsx` with BrowserRouter, AppLayout, and route tree
+- [x] Routes: `/` → Home, `/generate` → Generate, `*` → null stub
+
 ### 11.1 Landing/Home Page
-- [ ] Create hero section explaining ReForge
-- [ ] Add value proposition and benefits
-- [ ] Include "Get Started" CTA to main form
-- [ ] Design with modern aesthetics per Design Doc
+- [x] Create `pages/Home.jsx`
+- [x] Create hero section explaining ReForge
+- [x] Add value proposition (three-step how-it-works)
+- [x] Add benefits summary (three benefit cards)
+- [x] Include "Get Started" CTA to `/generate`
+- [x] Design with modern aesthetics per Design Doc (token-based, gradient hero)
 
 ### 11.2 Main Generation Form Page
-- [ ] Create form with fields:
-  - Target URL input
-  - Redesign goals multi-select
-  - Optional reference URL input
-- [ ] Add input validation
-- [ ] Implement form submission
-- [ ] Show loading state during processing
+- [x] Create `pages/Generate.jsx`
+- [x] Create form with fields:
+  - Target URL input (controlled, with validation)
+  - Redesign goals multi-select (visual chip UI, no external library)
+  - Optional reference URL input (controlled)
+- [x] Add client-side validation (required URL + valid format + ≥1 goal)
+- [x] Implement stub form submit handler (no API call, no navigation)
+- [ ] Show loading state during processing (Phase 12+)
 
 ### 11.3 Results/Preview Page
 - [ ] Display generation status/progress

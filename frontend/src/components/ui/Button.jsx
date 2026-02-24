@@ -28,11 +28,11 @@ function Button({
     className = '',
 }) {
     const base =
-        'inline-flex items-center justify-center rounded-button px-5 py-2.5 text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 shadow-button';
+        'inline-flex items-center justify-center rounded-button px-5 py-2.5 text-sm font-semibold transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 shadow-button';
 
     const variants = {
         primary:
-            'bg-primary text-white hover:bg-primary-dark focus-visible:ring-primary shadow-button-primary',
+            'bg-gradient-to-r from-primary to-primary-light text-white hover:brightness-90 focus-visible:ring-primary shadow-button-primary',
         secondary:
             'border border-primary bg-transparent text-primary hover:bg-light-gray focus-visible:ring-primary',
     };
