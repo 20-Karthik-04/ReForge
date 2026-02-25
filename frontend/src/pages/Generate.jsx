@@ -1,16 +1,44 @@
 /**
  * @file Generate.jsx
  * @description Main generation form page. Collects the target URL, redesign
- * goals, and an optional reference URL from the user. Performs client-side
- * validation only. No API calls. No useEffect. No navigation on submit.
+ * goals, and an optional reference URL from the user. On valid submit,
+ * runs the analysis step only:
+ *
+ *   dispatch(SET_INPUTS)
+ *   dispatch(ANALYZE_START)
+ *   await analyzeURL()
+ *   [await analyzeReference() if referenceUrl provided]
+ *   dispatch(ANALYZE_SUCCESS)
+ *   navigate('/analysis')
+ *
+ *   On any error: dispatch(SET_ERROR) → navigate('/error')
+ *
+ * State wiring:
+ *  - Reads `state.stage` to disable the form while `analyzing`.
+ *  - Dispatches actions to the pipeline reducer.
+ *  - All async calls are in the component (not the reducer).
+ *  - Single try/catch wraps the async sequence (one failure boundary).
+ *
+ * Navigation:
+ *  - navigate('/analysis') on ANALYZE_SUCCESS
+ *  - navigate('/error') on any error
  */
 
 import PropTypes from 'prop-types';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Container from '../components/layout/Container';
 import Section from '../components/layout/Section';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
+import usePipeline from '../context/usePipeline.js';
+import {
+    SET_INPUTS,
+    ANALYZE_START,
+    ANALYZE_SUCCESS,
+    SET_ERROR,
+} from '../context/pipelineReducer.js';
+import { analyzeURL, analyzeReference } from '../services/apiClient.js';
 
 // ─── Static constants ──────────────────────────────────────────────────────
 
@@ -48,6 +76,14 @@ const REDESIGN_GOALS = [
     },
 ];
 
+/**
+ * Pipeline stages during which form submission is not allowed.
+ * This page only runs analysis, so only `analyzing` is a busy stage.
+ *
+ * @type {Set<string>}
+ */
+const BUSY_STAGES = new Set(['analyzing']);
+
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 /**
@@ -76,17 +112,20 @@ function isValidUrl(value) {
  * @param {string}   props.description - Short description shown on the chip.
  * @param {boolean}  props.selected    - Whether this goal is currently selected.
  * @param {Function} props.onToggle    - Callback invoked with `id` when clicked.
+ * @param {boolean}  props.disabled    - Whether the chip is non-interactive.
  * @returns {JSX.Element}
  */
-function GoalChip({ id, label, description, selected, onToggle }) {
+function GoalChip({ id, label, description, selected, onToggle, disabled }) {
     return (
         <button
             type="button"
             id={`goal-${id}`}
             aria-pressed={selected}
+            disabled={disabled}
             onClick={() => onToggle(id)}
             className={[
                 'flex flex-col gap-1 rounded-card border-2 p-4 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+                disabled ? 'cursor-not-allowed opacity-50' : '',
                 selected
                     ? 'border-primary bg-primary text-white shadow-button-primary'
                     : 'border-light-gray-dark bg-white text-dark-navy hover:border-primary/40 hover:shadow-card',
@@ -116,6 +155,8 @@ GoalChip.propTypes = {
     selected: PropTypes.bool.isRequired,
     /** Toggle handler — receives goal `id` */
     onToggle: PropTypes.func.isRequired,
+    /** Disables interaction during active pipeline */
+    disabled: PropTypes.bool.isRequired,
 };
 
 // ─── Page Component ────────────────────────────────────────────────────────
@@ -124,10 +165,21 @@ GoalChip.propTypes = {
  * Generate – main generation form page.
  *
  * Collects the target URL, one or more redesign goals, and an optional
- * reference URL. Validates inputs client-side on submit attempt.
- * Does NOT call any API. Does NOT navigate on submit. Does NOT use useEffect.
+ * reference URL. Validates inputs client-side on submit, then runs the
+ * analysis step only:
  *
- * Allowed useState:
+ *   dispatch(SET_INPUTS)
+ *   dispatch(ANALYZE_START)
+ *   await analyzeURL()
+ *   [await analyzeReference() if referenceUrl provided]
+ *   dispatch(ANALYZE_SUCCESS)
+ *   navigate('/analysis')
+ *
+ *   On any error: dispatch(SET_ERROR) → navigate('/error')
+ *
+ * Planning and code generation are handled by Analysis.jsx and Plan.jsx.
+ *
+ * Local useState:
  *   - targetUrl    {string}       – controlled URL input value
  *   - referenceUrl {string}       – controlled optional URL input value
  *   - selectedGoals {Set<string>} – set of selected goal IDs
@@ -136,10 +188,16 @@ GoalChip.propTypes = {
  * @returns {JSX.Element}
  */
 function Generate() {
+    const { state, dispatch } = usePipeline();
+    const navigate = useNavigate();
+
     const [targetUrl, setTargetUrl] = useState('');
     const [referenceUrl, setReferenceUrl] = useState('');
     const [selectedGoals, setSelectedGoals] = useState(new Set());
     const [errors, setErrors] = useState({});
+
+    /** True while the pipeline is actively running — prevents double-submission. */
+    const isBusy = BUSY_STAGES.has(state.stage);
 
     /**
      * Toggles a goal ID in/out of the selectedGoals Set.
@@ -188,15 +246,71 @@ function Generate() {
     }
 
     /**
-     * Submit handler — validates only. No API call. No navigation.
+     * Submit handler — validates inputs, then runs the full pipeline.
+     * A single try/catch wraps the entire async sequence (one failure boundary).
      *
      * @param {React.FormEvent<HTMLFormElement>} event
      */
-    function handleSubmit(event) {
+    async function handleSubmit(event) {
         event.preventDefault();
+
+        // Prevent re-submission while a pipeline is already running
+        if (isBusy) return;
+
         const validationErrors = validate();
-        setErrors(validationErrors);
-        // Stub: when validation passes, pipeline integration goes here (Phase 12+)
+        if (Object.keys(validationErrors).length > 0) {
+            setErrors(validationErrors);
+            return;
+        }
+
+        const goals = [...selectedGoals];
+        const trimmedTarget = targetUrl.trim();
+        const trimmedReference = referenceUrl.trim();
+
+        // Store user inputs in global state
+        dispatch({
+            type: SET_INPUTS,
+            payload: {
+                targetUrl: trimmedTarget,
+                referenceUrl: trimmedReference,
+                goals,
+            },
+        });
+
+        try {
+            // ── Analyze target URL ────────────────────────────────────────
+            dispatch({ type: ANALYZE_START });
+
+            const { analysis: targetAnalysis } = await analyzeURL(trimmedTarget);
+
+            let referenceAnalysis = null;
+            if (trimmedReference) {
+                const { analysis } = await analyzeReference(trimmedReference);
+                referenceAnalysis = analysis;
+            }
+
+            dispatch({
+                type: ANALYZE_SUCCESS,
+                payload: { targetAnalysis, referenceAnalysis },
+            });
+
+            // ── Navigate to analysis page (plan triggered by user there) ──
+            navigate('/analysis');
+        } catch (error) {
+            // Normalise: apiClient interceptor already provides a structured object.
+            // If something else (e.g. JSON parse) throws, wrap it safely.
+            const structured =
+                error && typeof error.message === 'string'
+                    ? error
+                    : { message: 'An unexpected error occurred.', code: 'UNKNOWN_ERROR' };
+
+            dispatch({
+                type: SET_ERROR,
+                payload: { error: structured },
+            });
+
+            navigate('/error');
+        }
     }
 
     return (
@@ -235,10 +349,11 @@ function Generate() {
                             }}
                             placeholder="https://your-website.com"
                             error={errors.targetUrl || ''}
+                            disabled={isBusy}
                         />
 
                         {/* ── Redesign Goals ───────────────────────────── */}
-                        <fieldset>
+                        <fieldset disabled={isBusy}>
                             <legend className="mb-1 text-sm font-medium text-dark-navy">
                                 Redesign Goals{' '}
                                 <span className="text-dark-navy-light font-normal">
@@ -259,6 +374,7 @@ function Generate() {
                                         description={goal.description}
                                         selected={selectedGoals.has(goal.id)}
                                         onToggle={handleGoalToggle}
+                                        disabled={isBusy}
                                     />
                                 ))}
                             </div>
@@ -289,6 +405,7 @@ function Generate() {
                                 }}
                                 placeholder="https://a-website-you-like.com"
                                 error={errors.referenceUrl || ''}
+                                disabled={isBusy}
                             />
                             <p className="mt-1.5 text-xs text-dark-navy-light">
                                 Optional. ReForge extracts layout patterns from this URL for
@@ -301,12 +418,13 @@ function Generate() {
                             <Button
                                 type="submit"
                                 variant="primary"
+                                disabled={isBusy}
                                 className="w-full sm:w-auto px-8 py-3 text-base"
                             >
-                                Generate Redesign
+                                {isBusy ? 'Analyzing…' : 'Analyze Website'}
                             </Button>
                             <p className="text-xs text-dark-navy-light text-center sm:text-left">
-                                Analysis and code generation may take 20–60 seconds.
+                                Analysis may take 10–30 seconds.
                             </p>
                         </div>
                     </form>

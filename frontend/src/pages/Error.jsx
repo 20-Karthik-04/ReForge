@@ -1,31 +1,58 @@
 /**
  * @file Error.jsx
- * @description Application error page. Purely presentational — no error
- * detection, no props, no useState, no useEffect. Displays a static error
- * state with an icon, message, and action buttons.
+ * @description Application error page. Reads the structured error from the
+ * pipeline context and displays it to the user. The "Try Again" button
+ * dispatches RESET and navigates back to /generate.
+ *
+ * Fallback message is shown when no error is present in state (e.g. when the
+ * user navigates directly to /error without a prior pipeline failure).
  *
  * Rendered at: /error (nested inside AppLayout)
  */
 
 import PropTypes from 'prop-types';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Container from '../components/layout/Container';
 import Section from '../components/layout/Section';
 import Button from '../components/ui/Button';
+import usePipeline from '../context/usePipeline.js';
+import { RESET } from '../context/pipelineReducer.js';
+
+/** Fallback message shown when no error detail is available in state. */
+const FALLBACK_MESSAGE =
+    'ReForge encountered an unexpected problem while processing your ' +
+    'request. This is likely a transient issue — please try again, or ' +
+    'return to the home page to start fresh.';
 
 /**
- * Error – static application error page.
+ * Error – pipeline error page.
  *
- * Contains:
- *  - An inline SVG error icon.
- *  - A bold "Something Went Wrong" heading.
- *  - A short explanatory message consistent with the ReForge design voice.
- *  - A visual-only "Try Again" button (no handler).
- *  - A "Back to Home" link rendered via React Router's &lt;Link&gt;.
+ * Reads `state.error` from pipeline context:
+ *  - If present: displays `error.message`.
+ *  - If absent:  displays a generic fallback message.
+ *
+ * "Try Again" button:
+ *  1. Dispatches RESET (restores full initialState).
+ *  2. Navigates to /generate.
  *
  * @returns {JSX.Element}
  */
 function Error() {
+    const { state, dispatch } = usePipeline();
+    const navigate = useNavigate();
+
+    /** Resolved error message — from context or fallback. */
+    const errorMessage = state.error?.message ?? FALLBACK_MESSAGE;
+
+    /**
+     * Handles the "Try Again" action: resets global state then navigates
+     * to the generate page so the user can start a fresh pipeline run.
+     */
+    function handleRetry() {
+        dispatch({ type: RESET });
+        navigate('/generate');
+    }
+
     return (
         <Section>
             <Container>
@@ -61,15 +88,17 @@ function Error() {
                         </h1>
 
                         <p className="text-base text-dark-navy-light">
-                            ReForge encountered an unexpected problem while processing your
-                            request. This is likely a transient issue — please try again, or
-                            return to the home page to start fresh.
+                            {errorMessage}
                         </p>
                     </div>
 
                     {/* ── Action buttons ────────────────────────────────── */}
                     <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-                        <Button variant="primary" className="w-full sm:w-auto px-8">
+                        <Button
+                            variant="primary"
+                            className="w-full sm:w-auto px-8"
+                            onClick={handleRetry}
+                        >
                             Try Again
                         </Button>
 

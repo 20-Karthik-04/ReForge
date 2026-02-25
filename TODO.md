@@ -531,29 +531,29 @@ This document outlines the complete development plan for the ReForge AI-assisted
   - Optional reference URL input (controlled)
 - [x] Add client-side validation (required URL + valid format + ≥1 goal)
 - [x] Implement stub form submit handler (no API call, no navigation)
-- [ ] Show loading state during processing (Phase 12+)
+- [x] Show loading state during processing (implemented in Phase 12)
 
 ### 11.3 Results/Preview Page
-- [ ] Display generation status/progress
-- [ ] Show AI redesign plan summary
-- [ ] Implement live preview iframe of generated page
-- [ ] Add "Download ZIP" button
-- [ ] Show code snippets (optional)
-- [ ] Add "Generate Again" and "Edit Goals" actions
+- [x] Display generation status/progress
+- [x] Show AI redesign plan summary
+- [x] Implement live preview iframe of generated page
+- [x] Add "Download ZIP" button
+- [x] Show code snippets (optional)
+- [x] Add "Generate Again" and "Edit Goals" actions
 
 ### 11.4 Error Handling Page
-- [ ] Create error display component
-- [ ] Show user-friendly error messages
-- [ ] Provide retry options
-- [ ] Log errors for debugging
+- [x] Create error display component
+- [x] Show user-friendly error messages
+- [x] Provide retry options
+- [x] Log errors for debugging
 
 ---
 
 ## Phase 12: Frontend - State Management
 
 ### 12.1 Application State
-- [ ] Set up state management (React Context or Zustand)
-- [ ] Define state slices:
+- [x] Set up state management (React Context + useReducer)
+- [x] Define state slices:
   - Target analysis
   - Reference analysis
   - Redesign plan
@@ -562,16 +562,17 @@ This document outlines the complete development plan for the ReForge AI-assisted
   - Error states
 
 ### 12.2 API Integration Layer
-- [ ] Create API client service
-- [ ] Implement API call functions:
+- [x] Create API client service
+- [x] Implement API call functions:
   - `analyzeURL(url)`
   - `analyzeReference(url)`
   - `generatePlan(data)`
   - `generateCode(plan)`
   - `downloadZIP(output)`
-- [ ] Add error handling and retries
+- [x] Add error handling (structured error interceptor; no retry logic per spec)
 
 ---
+
 
 ## Phase 13: Frontend - User Flow Implementation
 
@@ -597,15 +598,15 @@ This document outlines the complete development plan for the ReForge AI-assisted
 - [ ] Option to approve or regenerate
 
 ### 13.4 Step 4: Code Generation
-- [ ] Call code generation endpoint
-- [ ] Show progress indicator
-- [ ] Display generated file structure
+- [x] Call code generation endpoint
+- [x] Show progress indicator
+- [x] Display generated file structure
 
 ### 13.5 Step 5: Preview and Download
-- [ ] Render live preview in iframe
-- [ ] Enable ZIP download
-- [ ] Provide code viewing option
-- [ ] Allow user to start over
+- [x] Render live preview in iframe
+- [x] Enable ZIP download
+- [x] Provide code viewing option
+- [x] Allow user to start over
 
 ---
 
