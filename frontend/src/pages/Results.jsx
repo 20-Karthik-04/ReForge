@@ -18,7 +18,7 @@
  * Rendered at: /results (nested inside AppLayout)
  */
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import Container from '../components/layout/Container';
@@ -27,7 +27,7 @@ import Spinner from '../components/ui/Spinner';
 import Button from '../components/ui/Button';
 import usePipeline from '../context/usePipeline.js';
 import { RESET, SET_ERROR } from '../context/pipelineReducer.js';
-import { downloadZIP } from '../services/apiClient.js';
+import { downloadZIP, fetchPreviewHtml } from '../services/apiClient.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -161,46 +161,124 @@ GeneratingView.propTypes = {
 // ─── CompleteView ─────────────────────────────────────────────────────────────
 
 /**
+ * Device widths used by the responsive preview toggle.
+ * Values are applied as inline `width` on the preview container.
+ * Desktop uses 100% to fill the available column; tablet and mobile use fixed
+ * pixel widths that match standard breakpoints.
+ *
+ * @type {Record<'desktop'|'tablet'|'mobile', string>}
+ */
+const DEVICE_WIDTHS = {
+    desktop: '100%',
+    tablet: '768px',
+    mobile: '375px',
+};
+
+/**
  * CompleteView – shown when `stage === 'complete'`.
  *
  * Renders:
  *  1. "Redesign Complete" heading with success badge.
  *  2. Generated file structure (or static placeholder when absent).
- *  3. Live preview iframe (or placeholder text when no previewHtml).
+ *  3. Responsive live preview iframe with device toggle and fullscreen support.
  *  4. Action buttons: "Download Source Code" and "Start Over".
+ *
+ * Preview lifecycle:
+ *  - On mount (stage === 'complete'), calls fetchPreviewHtml({generatedOutput}).
+ *  - Backend sanitizes and wraps the entry-point file into a static HTML doc.
+ *  - Result is placed into a blob URL supplied to the iframe src attribute.
+ *  - Object URL is revoked on unmount and whenever the source changes.
+ *  - Errors dispatch SET_ERROR and invoke the onError callback.
  *
  * @param {object}   props
  * @param {object|null} props.generatedOutput - The generatedOutput from state.
  * @param {Function} props.onDownload  - Called when Download button is clicked.
  * @param {Function} props.onStartOver - Called when Start Over button is clicked.
+ * @param {Function} props.onError     - Called with a structured error if preview fetch fails.
  * @param {boolean}  props.isDownloading - Whether a download is in flight.
  * @returns {JSX.Element}
  */
-function CompleteView({ generatedOutput, onDownload, onStartOver, isDownloading }) {
+function CompleteView({ generatedOutput, onDownload, onStartOver, onError, isDownloading }) {
     const fileStructure = generatedOutput?.fileStructure ?? null;
-    const previewHtml = generatedOutput?.previewHtml ?? null;
 
-    // ── Blob lifecycle for preview iframe ─────────────────────────────────
-    // Derived synchronously to satisfy the react-hooks/set-state-in-effect lint rule.
-    const iframeSrc = useMemo(() => {
-        if (!previewHtml) return null;
-        try {
-            const blob = new Blob([previewHtml], { type: 'text/html' });
-            return URL.createObjectURL(blob);
-        } catch {
-            // ReForge codebase is strictly warning-free; suppress logging here
-            return null;
-        }
-    }, [previewHtml]);
+    // ── Device toggle state ────────────────────────────────────────────────
+    /** @type {'desktop'|'tablet'|'mobile'} */
+    const [deviceMode, setDeviceMode] = useState('desktop');
 
+    // ── Preview blob URL state ─────────────────────────────────────────────
+    /** Blob URL for the preview iframe, or null while loading/unavailable. */
+    const [previewSrc, setPreviewSrc] = useState(null);
+
+    /**
+     * Fetch the preview HTML from the backend, convert to a blob URL,
+     * and store it in state. Runs once when generatedOutput is available.
+     * Cleans up the previous blob URL before creating a new one.
+     *
+     * Guard: only runs when generatedOutput is non-null (avoids redundant
+     * fetches when the component is rendered without output).
+     */
     useEffect(() => {
-        // Revoke the object URL on unmount or when previewHtml changes
+        if (!generatedOutput) return undefined;
+
+        let objectUrl = null;
+        let cancelled = false;
+
+        async function load() {
+            try {
+                const html = await fetchPreviewHtml({ generatedOutput });
+                if (cancelled) return;
+
+                const blob = new Blob([html], { type: 'text/html' });
+                objectUrl = URL.createObjectURL(blob);
+                setPreviewSrc(objectUrl);
+            } catch (err) {
+                if (cancelled) return;
+                // Surface error to the parent page component which will dispatch
+                // SET_ERROR and navigate to /error — matching the download handler pattern.
+                const structured =
+                    err && typeof err.message === 'string'
+                        ? err
+                        : { message: 'Preview failed to load.', code: 'PREVIEW_ERROR' };
+                onError(structured);
+            }
+        }
+
+        load();
+
         return () => {
-            if (iframeSrc) {
-                URL.revokeObjectURL(iframeSrc);
+            // Revoke object URL on unmount or if generatedOutput changes (cleanup).
+            cancelled = true;
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
             }
         };
-    }, [iframeSrc]);
+        // onError is stable (useCallback in parent); generatedOutput identity is
+        // controlled by the reducer and only changes on RESET / SET_GENERATED.
+    }, [generatedOutput, onError]);
+
+    // ── Fullscreen support ─────────────────────────────────────────────────
+    /** Ref attached to the preview container element for Fullscreen API targeting. */
+    const previewContainerRef = useRef(null);
+
+    /**
+     * Requests fullscreen on the preview container.
+     * Falls back gracefully if the Fullscreen API is unavailable (e.g. some
+     * mobile browsers) or if the browser rejects the request.
+     */
+    function handleFullscreen() {
+        const el = previewContainerRef.current;
+        if (!el) return;
+
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {
+                // Ignore errors on exit — no observable state to restore
+            });
+        } else if (el.requestFullscreen) {
+            el.requestFullscreen().catch(() => {
+                // Ignore — fallback environments (e.g. embedded WebView) may reject
+            });
+        }
+    }
 
     // ── Static placeholder nodes (shown when fileStructure is null) ────────
     /** @type {FileNode} */
@@ -269,29 +347,83 @@ function CompleteView({ generatedOutput, onDownload, onStartOver, isDownloading 
 
             {/* ── Live Preview ─────────────────────────────────────────── */}
             <div className="flex flex-col gap-3">
-                <p className="text-sm font-semibold text-dark-navy">
-                    Live Preview
-                </p>
+                {/* ── Preview toolbar: device toggles + fullscreen ──── */}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-dark-navy">
+                        Live Preview
+                    </p>
 
-                <div
-                    className={[
-                        'rounded-card border-2 border-light-gray-dark',
-                        'bg-light-gray overflow-hidden',
-                        'min-h-[480px] flex items-center justify-center',
-                    ].join(' ')}
-                >
-                    {iframeSrc ? (
-                        <iframe
-                            src={iframeSrc}
-                            title="Generated site preview"
-                            className="h-full w-full min-h-[480px] border-0"
-                            sandbox="allow-scripts"
-                        />
-                    ) : (
-                        <p className="text-sm text-dark-navy-light">
-                            Preview not available in this environment.
-                        </p>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {/* Device toggle buttons */}
+                        {/** @type {Array<{id: 'desktop'|'tablet'|'mobile', label: string}>} */}
+                        {[
+                            { id: 'desktop', label: 'Desktop' },
+                            { id: 'tablet', label: 'Tablet' },
+                            { id: 'mobile', label: 'Mobile' },
+                        ].map(({ id, label }) => (
+                            <button
+                                key={id}
+                                type="button"
+                                id={`preview-device-${id}`}
+                                aria-pressed={deviceMode === id}
+                                onClick={() => setDeviceMode(id)}
+                                className={[
+                                    'rounded px-3 py-1 text-xs font-medium transition-colors',
+                                    deviceMode === id
+                                        ? 'bg-dark-navy text-white'
+                                        : 'bg-light-gray text-dark-navy hover:bg-light-gray-dark',
+                                ].join(' ')}
+                            >
+                                {label}
+                            </button>
+                        ))}
+
+                        {/* Fullscreen toggle */}
+                        <button
+                            type="button"
+                            id="preview-fullscreen-btn"
+                            onClick={handleFullscreen}
+                            className="rounded px-3 py-1 text-xs font-medium bg-light-gray text-dark-navy hover:bg-light-gray-dark transition-colors"
+                        >
+                            Open Fullscreen Preview
+                        </button>
+                    </div>
+                </div>
+
+                {/* ── Device-width constrained preview frame ───────── */}
+                {/*
+                 * Outer wrapper: centers the inner container and clips overflow.
+                 * Inner container: width transitions smoothly on device change.
+                 * The ref targets the inner container for Fullscreen API.
+                 */}
+                <div className="overflow-x-auto rounded-card border-2 border-light-gray-dark bg-light-gray">
+                    <div
+                        ref={previewContainerRef}
+                        style={{
+                            width: DEVICE_WIDTHS[deviceMode],
+                            transition: 'width 0.3s ease',
+                            margin: '0 auto',
+                            minHeight: '480px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                    >
+                        {previewSrc ? (
+                            <iframe
+                                src={previewSrc}
+                                title="Generated site preview"
+                                style={{ width: '100%', minHeight: '480px', border: 0, display: 'block' }}
+                                sandbox="allow-scripts"
+                            />
+                        ) : (
+                            <p className="text-sm text-dark-navy-light">
+                                {generatedOutput
+                                    ? 'Loading preview…'
+                                    : 'Preview not available in this environment.'}
+                            </p>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -328,6 +460,11 @@ CompleteView.propTypes = {
     onDownload: PropTypes.func.isRequired,
     /** Handler for the "Start Over" button. */
     onStartOver: PropTypes.func.isRequired,
+    /**
+     * Called with a structured error if the preview fetch fails.
+     * Parent dispatches SET_ERROR and navigates to /error.
+     */
+    onError: PropTypes.func.isRequired,
     /** True while a download request is in flight — disables both buttons. */
     isDownloading: PropTypes.bool.isRequired,
 };
@@ -442,6 +579,30 @@ function Results() {
         navigate('/generate');
     }
 
+    // ── Preview error handler ───────────────────────────────────────────────
+
+    /**
+     * Called by CompleteView when the preview fetch fails.
+     * Mirrors the download error-handling pattern: dispatch SET_ERROR then
+     * navigate to /error. Uses useCallback to keep the reference stable
+     * (CompleteView's useEffect depends on it via the onError prop).
+     *
+     * IMPORTANT: must be declared here (before all early returns) to satisfy
+     * React's Rules of Hooks — Hooks must be called unconditionally.
+     *
+     * @type {(err: {message: string, code: string}) => void}
+     */
+    const handlePreviewError = useCallback(
+        (err) => {
+            dispatch({
+                type: SET_ERROR,
+                payload: { error: err },
+            });
+            navigate('/error');
+        },
+        [dispatch, navigate]
+    );
+
     // ── Stage-gated rendering ──────────────────────────────────────────────
 
     if (stage === 'generating') {
@@ -465,6 +626,7 @@ function Results() {
                             generatedOutput={generatedOutput}
                             onDownload={handleDownload}
                             onStartOver={handleStartOver}
+                            onError={handlePreviewError}
                             isDownloading={isDownloading}
                         />
                     </div>

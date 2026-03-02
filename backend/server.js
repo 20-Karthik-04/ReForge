@@ -26,6 +26,7 @@ import generatePlanRouter from './routes/generatePlan.js';
 import generateCodeRouter from './routes/generateCode.js';
 import generateZipRouter from './routes/generateZip.js';
 import generateFullRouter from './routes/generateFull.js';
+import previewRouter from './routes/preview.js';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler.js';
@@ -89,6 +90,7 @@ app.use('/api', generatePlanRouter);
 app.use('/api', generateCodeRouter);
 app.use('/api', generateZipRouter);
 app.use('/api', generateFullRouter);
+app.use('/api', previewRouter);
 
 // ── 404 handler for unregistered routes ─────────────────────────────────────
 app.use((_req, res) => {

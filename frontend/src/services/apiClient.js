@@ -142,3 +142,19 @@ export async function downloadZIP(data) {
     });
     return response.data;
 }
+
+/**
+ * Requests a sandboxed HTML preview document from the backend.
+ *
+ * The backend sanitizes and wraps the generatedOutput entry-point file into a
+ * static HTML document with Tailwind CDN. Returns the raw HTML string so the
+ * caller can supply it to a blob URL for iframe display.
+ *
+ * @param {{ generatedOutput: object }} data
+ * @returns {Promise<string>} Plain HTML string ready for blob injection.
+ * @throws {{ message: string, code: string, status?: number }}
+ */
+export async function fetchPreviewHtml(data) {
+    const response = await api.post('/api/preview', data, { responseType: 'text' });
+    return response.data;
+}
