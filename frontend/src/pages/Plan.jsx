@@ -20,7 +20,7 @@
  *  - navigate('/error')    – on any error
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import Container from '../components/layout/Container';
@@ -60,6 +60,19 @@ function Plan() {
 
     /** Prevents double-trigger while code generation call is in flight. */
     const [isGenerating, setIsGenerating] = useState(false);
+
+    /**
+     * Tracks whether the component is still mounted.
+     * Guards against calling setIsRegenerating / setIsGenerating in the
+     * finally block after navigate() has already unmounted this component.
+     */
+    const mountedRef = useRef(true);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
 
     const { stage, redesignPlan, targetAnalysis, referenceAnalysis, inputs } = state;
 
@@ -111,7 +124,11 @@ function Plan() {
 
             navigate('/error');
         } finally {
-            setIsRegenerating(false);
+            // Guard: only update local state if still mounted.
+            // navigate('/error') unmounts before finally executes.
+            if (mountedRef.current) {
+                setIsRegenerating(false);
+            }
         }
     }
 
@@ -152,7 +169,11 @@ function Plan() {
 
             navigate('/error');
         } finally {
-            setIsGenerating(false);
+            // Guard: only update local state if still mounted.
+            // navigate('/results') or navigate('/error') unmounts before finally.
+            if (mountedRef.current) {
+                setIsGenerating(false);
+            }
         }
     }
 

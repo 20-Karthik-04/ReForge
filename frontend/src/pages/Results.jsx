@@ -18,7 +18,7 @@
  * Rendered at: /results (nested inside AppLayout)
  */
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import Container from '../components/layout/Container';
@@ -358,6 +358,20 @@ function Results() {
     /** True while a ZIP download request is in flight. */
     const [isDownloading, setIsDownloading] = useState(false);
 
+    /**
+     * Tracks whether the component is still mounted.
+     * Prevents calling setIsDownloading(false) after navigate() has unmounted
+     * the component (avoids the "can't perform a state update on unmounted
+     * component" scenario).
+     */
+    const mountedRef = useRef(true);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
+
     // ── Idle guard ─────────────────────────────────────────────────────────
     // Prevents invalid deep-links: /results visited without preceding state.
     useEffect(() => {
@@ -387,11 +401,14 @@ function Results() {
             const blob = new Blob([blobData], { type: 'application/zip' });
             const url = URL.createObjectURL(blob);
 
+            // Anchor must be appended to document.body before .click() is
+            // called; otherwise Firefox silently ignores the download.
             const a = document.createElement('a');
             a.href = url;
             a.download = 'reforge-output.zip';
+            document.body.appendChild(a);
             a.click();
-            a.remove();
+            document.body.removeChild(a);
 
             URL.revokeObjectURL(url);
         } catch (err) {
@@ -407,7 +424,11 @@ function Results() {
 
             navigate('/error');
         } finally {
-            setIsDownloading(false);
+            // Guard: only update local state if still mounted.
+            // navigate('/error') above unmounts this component before finally runs.
+            if (mountedRef.current) {
+                setIsDownloading(false);
+            }
         }
     }
 

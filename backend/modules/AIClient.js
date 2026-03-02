@@ -57,12 +57,19 @@ export class AIClient {
      * @throws {Error} If input validation fails
      */
     async generateRedesignPlan(targetAnalysis, goals, referenceAnalysis = null) {
-        try {
-            // CRITICAL: Validate input safety before processing
-            this._validateInputSafety(targetAnalysis);
+        // CRITICAL: Input validation runs OUTSIDE the AI-failure catch block.
+        // A bad input is a programming error, not an AI service failure — it must
+        // NOT be silently absorbed and replaced with a fallback plan.
+        this._validateInputSafety(targetAnalysis);
 
+        try {
             // Build prompt from structured data
             const prompt = PromptBuilder.buildPrompt(targetAnalysis, goals, referenceAnalysis);
+
+            // Validate the constructed prompt for safety before transmission.
+            // validatePromptSafety only emits console.warn for PII — it throws
+            // only on hard violations (raw HTML, script tags).
+            PromptBuilder.validatePromptSafety(prompt.user);
 
             // Log prompt (without sensitive data - only structure)
             console.log('📤 Sending structured redesign request to AI...');
@@ -85,7 +92,7 @@ export class AIClient {
             console.warn('⚠️  AI plan generation failed:', error.message);
             console.log('   Using fallback default plan...');
 
-            // Return fallback plan
+            // Return fallback plan (only reached on AI API / parse / schema errors)
             return this._getDefaultPlan(targetAnalysis);
         }
     }
@@ -319,16 +326,18 @@ export class AIClient {
             }
         }
 
-        // Create default layout variants
+        // Create default layout variants.
+        // CRITICAL: variant strings MUST match BACKEND_TEMPLATE_REGISTRY exactly
+        // so the fallback plan can pass validateVariant() in CodeGenerator.
         const layoutVariants = {
             hero: 'split',
-            features: 'grid',
+            features: 'grid3',
             benefits: 'alternating',
             courses: 'grid',
             testimonials: 'carousel',
-            pricing: '3-column',
-            faq: 'accordion',
-            cta: 'centered',
+            pricing: 'three-tier',
+            faq: 'default',
+            cta: 'gradient',
         };
 
         // Create component mappings

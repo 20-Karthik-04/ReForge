@@ -93,12 +93,6 @@ export class WebCrawler {
                 return status >= 200 && status < 400;
             },
             responseType: 'text',
-            // Handle SSL in development (for testing purposes)
-            httpsAgent: process.env.NODE_ENV === 'production'
-                ? undefined
-                : new (await import('https')).Agent({
-                    rejectUnauthorized: false,
-                }),
         });
 
         // Validate content type

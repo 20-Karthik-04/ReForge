@@ -20,7 +20,7 @@
  *  - navigate('/error')    – on any planning error
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import Container from '../components/layout/Container';
@@ -82,6 +82,19 @@ function Analysis() {
     /** Prevents double-trigger while planning API call is in flight. */
     const [isPlanningBusy, setIsPlanningBusy] = useState(false);
 
+    /**
+     * Tracks whether the component is still mounted.
+     * Guards against calling setIsPlanningBusy(false) in the finally block
+     * after navigate() has already unmounted this component.
+     */
+    const mountedRef = useRef(true);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
+
     const { stage, targetAnalysis, referenceAnalysis, inputs } = state;
 
     // ── Stale-state guard ──────────────────────────────────────────────────
@@ -132,7 +145,12 @@ function Analysis() {
 
             navigate('/error');
         } finally {
-            setIsPlanningBusy(false);
+            // Guard: only update local state if still mounted.
+            // navigate('/plan') or navigate('/error') unmounts this component
+            // before the finally block executes.
+            if (mountedRef.current) {
+                setIsPlanningBusy(false);
+            }
         }
     }
 
