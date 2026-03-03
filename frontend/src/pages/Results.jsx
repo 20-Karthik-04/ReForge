@@ -542,7 +542,7 @@ function Results() {
             // called; otherwise Firefox silently ignores the download.
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'reforge-output.zip';
+            a.download = `reforge-output-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
