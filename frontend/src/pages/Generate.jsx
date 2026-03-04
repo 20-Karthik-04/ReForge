@@ -50,27 +50,27 @@ import { analyzeURL, analyzeReference } from '../services/apiClient.js';
  */
 const REDESIGN_GOALS = [
     {
-        id: 'modern-design',
+        id: 'modern_design',
         label: 'Modern Design',
         description: 'Refresh visual style with contemporary aesthetics and layout patterns.',
     },
     {
-        id: 'conversion-rate',
+        id: 'improved_conversion',
         label: 'Improved Conversion Rate',
         description: 'Strengthen CTAs, tighten value propositions, and reduce friction.',
     },
     {
-        id: 'mobile-responsiveness',
+        id: 'mobile_responsiveness',
         label: 'Better Mobile Responsiveness',
         description: 'Optimize layout, spacing, and touch targets for mobile devices.',
     },
     {
-        id: 'accessibility',
+        id: 'enhanced_accessibility',
         label: 'Enhanced Accessibility',
         description: 'Fix heading hierarchy, contrast ratios, and keyboard navigation.',
     },
     {
-        id: 'cleaner-layout',
+        id: 'cleaner_layout',
         label: 'Cleaner Layout and Structure',
         description: 'Remove visual clutter and establish clear content hierarchy.',
     },

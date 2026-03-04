@@ -62,7 +62,8 @@ export class AnalysisBuilder {
         if (analyzedSections.length === 0) {
             // Fallback: create a single generic section from body
             const bodyText = $('body').text();
-            const wordCount = bodyText.trim().split(/\s+/).length;
+            const trimmedBody = bodyText.trim();
+            const wordCount = trimmedBody.length === 0 ? 0 : trimmedBody.split(/\s+/).length;
             analyzedSections.push({
                 type: 'other',
                 contentLength: wordCount,

@@ -115,6 +115,13 @@ const BACKEND_TEMPLATE_REGISTRY = {
         variants: ['default'],
         requiredProps: ['logoText', 'linkGroups'],
     },
+
+    /** Catch-all — unclassified sections from Phase 5 ContentAnalyzer */
+    other: {
+        componentName: 'FeaturesSection',
+        variants: ['list'],
+        requiredProps: [],
+    },
 };
 
 // =============================================================================

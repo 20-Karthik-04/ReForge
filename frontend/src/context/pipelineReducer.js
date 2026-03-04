@@ -4,7 +4,7 @@
  * state machine. Contains no side effects, no async logic, and no navigation.
  *
  * State machine transitions:
- *   idle → analyzing → planning → generating → complete
+ *   idle → analyzing → analyzed → planning → planned → generating → complete
  *   any stage → error (via SET_ERROR)
  *   error | any → idle (via RESET)
  */
@@ -48,7 +48,7 @@ export const RESET = 'RESET';
  */
 
 /**
- * @typedef {'idle' | 'analyzing' | 'planning' | 'generating' | 'complete' | 'error'} PipelineStage
+ * @typedef {'idle' | 'analyzing' | 'analyzed' | 'planning' | 'generating' | 'complete' | 'error'} PipelineStage
  */
 
 /**
@@ -130,6 +130,7 @@ export function pipelineReducer(state, action) {
         case ANALYZE_SUCCESS:
             return {
                 ...state,
+                stage: 'analyzed',   // ← advance out of 'analyzing' so Analysis.jsx renders results
                 targetAnalysis: action.payload.targetAnalysis,
                 referenceAnalysis: action.payload.referenceAnalysis ?? null,
             };
@@ -143,6 +144,7 @@ export function pipelineReducer(state, action) {
         case PLAN_SUCCESS:
             return {
                 ...state,
+                stage: 'planned',   // ← advance out of 'planning' so Plan.jsx renders the plan
                 redesignPlan: action.payload.redesignPlan,
             };
 

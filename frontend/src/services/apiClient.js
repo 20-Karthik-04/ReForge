@@ -28,6 +28,9 @@ const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
+    // 90 s hard timeout — prevents the spinner from hanging forever when the
+    // backend is slow (e.g. crawling a slow site, AI retries, SSL errors).
+    timeout: 90000,
 });
 
 // ─── Response Interceptor — Structured Error Normalisation ──────────────────
@@ -109,7 +112,14 @@ export async function analyzeReference(url) {
  * @throws {{ message: string, code: string, status?: number }}
  */
 export async function generatePlan(data) {
-    const response = await api.post('/api/generate-plan', data);
+    // GeneratePlanRequestSchema uses .optional() (not .nullable()), so Zod
+    // rejects null. Strip the key when referenceAnalysis is absent so the
+    // field is undefined (i.e. absent) on the wire, not explicitly null.
+    const body = { ...data };
+    if (body.referenceAnalysis === null) {
+        delete body.referenceAnalysis;
+    }
+    const response = await api.post('/api/generate-plan', body);
     return response.data;
 }
 

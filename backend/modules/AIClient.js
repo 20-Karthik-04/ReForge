@@ -1,60 +1,63 @@
 /**
- * @fileoverview AI Client service for LLM API integration
+ * @fileoverview AI Client service for Groq API integration
  * @module backend/modules/AIClient
+ *
+ * PROVIDER: Groq  —  endpoint: https://api.groq.com/openai/v1/chat/completions
+ * AI is used ONLY for high-level redesign planning – NOT for code generation.
+ * All code generation remains fully deterministic.
  */
 
-/* global setTimeout */
+/* global setTimeout, fetch */
 
-import axios from 'axios';
-import { validateAIRedesignPlan, WebPageAnalysisSchema, AIRedesignPlanSchema } from '../../shared/schemas.js';
+import { validateAIRedesignPlan, WebPageAnalysisSchema } from '../../shared/schemas.js';
 import { PromptBuilder } from './PromptBuilder.js';
 
+/** Groq REST API endpoint (OpenAI-compatible) */
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+/** Default model – low temperature to preserve planning stability */
+const GROQ_DEFAULT_MODEL = 'llama-3.3-70b-versatile';
+
 /**
- * AIClient service for generating redesign plans using LLM API
- * AI is used ONLY for high-level redesign planning - NOT for code generation
+ * AIClient service for generating redesign plans using the Groq LLM API.
+ * AI assists ONLY in planning; code generation remains deterministic.
  */
 export class AIClient {
     /**
-     * Creates a new AIClient instance
+     * Creates a new AIClient instance.
      * @param {Object} options - Configuration options
-     * @param {string} [options.apiKey] - LLM API key (defaults to env var)
-     * @param {string} [options.apiUrl] - LLM API endpoint (defaults to env var)
-     * @param {string} [options.model] - LLM model name (defaults to env var)
-     * @param {number} [options.timeout=30000] - Request timeout in milliseconds
-     * @param {number} [options.maxRetries=3] - Maximum number of retry attempts
+     * @param {string} [options.apiKey]    - Groq API key (defaults to GROQ_API_KEY env var)
+     * @param {string} [options.apiUrl]    - Override API endpoint (for testing)
+     * @param {string} [options.model]     - Override model name
+     * @param {number} [options.timeout=30000]   - Request timeout in milliseconds
+     * @param {number} [options.maxRetries=3]    - Maximum number of retry attempts
      */
     constructor(options = {}) {
-        this.apiKey = options.apiKey || process.env.LLM_API_KEY;
-        this.provider = options.provider || process.env.LLM_PROVIDER || 'openai';
-        this.model = options.model || process.env.LLM_MODEL || 'gpt-4';
+        this.apiKey = options.apiKey || process.env.GROQ_API_KEY;
+        this.apiUrl = options.apiUrl || GROQ_API_URL;
+        this.model = options.model || process.env.LLM_MODEL || GROQ_DEFAULT_MODEL;
         this.timeout = options.timeout || 30000;
         this.maxRetries = options.maxRetries || 3;
 
-        // Set API URL based on provider
-        if (options.apiUrl) {
-            this.apiUrl = options.apiUrl;
-        } else if (process.env.LLM_API_URL) {
-            this.apiUrl = process.env.LLM_API_URL;
-        } else if (this.provider === 'gemini') {
-            // Gemini API URL format: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
-            this.apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`;
-        } else {
-            // Default to OpenAI
-            this.apiUrl = 'https://api.openai.com/v1/chat/completions';
-        }
-
         if (!this.apiKey) {
-            console.warn('⚠️  LLM_API_KEY not configured. AI client will use fallback plans.');
+            console.warn('⚠️  GROQ_API_KEY not configured. AI client will use fallback plans.');
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // PUBLIC API  (signatures preserved exactly)
+    // ─────────────────────────────────────────────────────────────────────────
+
     /**
-     * Generates a redesign plan using LLM
-     * @param {Object} targetAnalysis - WebPageAnalysis object
-     * @param {string[]} goals - Array of redesign goals
-     * @param {Object} [referenceAnalysis] - Optional ReferenceAnalysis object
+     * Generates a redesign plan using the Groq LLM.
+     * Pipeline order is preserved: validate → build prompt → validate prompt →
+     * call provider → parse JSON → validate schema → return plan.
+     *
+     * @param {Object}   targetAnalysis    - WebPageAnalysis object
+     * @param {string[]} goals             - Array of redesign goals
+     * @param {Object}   [referenceAnalysis] - Optional ReferenceAnalysis object
      * @returns {Promise<Object>} AIRedesignPlan object
-     * @throws {Error} If input validation fails
+     * @throws {Error} If input validation fails (programming error, not AI error)
      */
     async generateRedesignPlan(targetAnalysis, goals, referenceAnalysis = null) {
         // CRITICAL: Input validation runs OUTSIDE the AI-failure catch block.
@@ -71,8 +74,8 @@ export class AIClient {
             // only on hard violations (raw HTML, script tags).
             PromptBuilder.validatePromptSafety(prompt.user);
 
-            // Log prompt (without sensitive data - only structure)
-            console.log('📤 Sending structured redesign request to AI...');
+            // Log prompt structure (no sensitive data)
+            console.log('📤 Sending structured redesign request to Groq AI...');
             console.log(`   Goals: ${goals.join(', ')}`);
             console.log(`   Sections to analyze: ${targetAnalysis.sections.length}`);
 
@@ -82,7 +85,7 @@ export class AIClient {
             // Parse and validate response
             const plan = this._parseResponse(responseText);
 
-            // Log success (without sensitive data)
+            // Log success (no sensitive data)
             console.log('✓ AI redesign plan generated successfully');
             console.log(`   Recommended sections: ${plan.sectionOrdering.length}`);
             console.log(`   Component mappings: ${plan.componentMappings.length}`);
@@ -97,9 +100,13 @@ export class AIClient {
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // PRIVATE METHODS
+    // ─────────────────────────────────────────────────────────────────────────
+
     /**
-     * CRITICAL: Validates input safety before sending to AI
-     * Ensures no raw HTML, scripts, DOM, or unbounded strings are present
+     * CRITICAL: Validates input safety before sending to AI.
+     * Ensures no raw HTML, scripts, DOM, or unbounded strings are present.
      * @private
      * @param {Object} targetAnalysis - WebPageAnalysis to validate
      * @throws {Error} If input contains unsafe data
@@ -112,7 +119,6 @@ export class AIClient {
             throw new Error(`Input validation failed: Invalid WebPageAnalysis schema - ${schemaError.message}`);
         }
 
-        // Check for raw HTML patterns (should not exist in structured JSON)
         const jsonString = JSON.stringify(targetAnalysis);
 
         // Reject if contains HTML tags (indicates raw HTML leaked in)
@@ -130,28 +136,39 @@ export class AIClient {
             throw new Error('Input validation failed: Unbounded string detected (possible raw DOM)');
         }
 
-        // Additional check: ensure URL is valid and not a data URI or script
-        if (targetAnalysis.url && (targetAnalysis.url.startsWith('data:') || targetAnalysis.url.startsWith('javascript:'))) {
+        // Reject data URIs or script URLs
+        if (
+            targetAnalysis.url &&
+            (targetAnalysis.url.startsWith('data:') || targetAnalysis.url.startsWith('javascript:'))
+        ) {
             throw new Error('Input validation failed: Invalid URL protocol');
         }
     }
 
     /**
-     * Parses and validates AI response
-     * CRITICAL: Strict JSON-only parsing - rejects JSX, HTML, and non-JSON content
+     * Parses and validates the AI response.
+     * CRITICAL: Strict JSON-only parsing — rejects JSX, HTML, and non-JSON content.
      * @private
      * @param {string} responseText - Raw AI response text
      * @returns {Object} Validated AIRedesignPlan
      * @throws {Error} If response is invalid or contains non-JSON content
      */
     _parseResponse(responseText) {
-        // Extract JSON from response (AI might wrap in markdown code blocks)
+        // Guard: empty or missing content from provider must throw, not silently fail
+        if (!responseText || !responseText.trim()) {
+            throw new Error('AI response parsing failed: Empty LLM response');
+        }
+
         let jsonText = responseText.trim();
 
-        // Remove markdown code fences if present (must be JSON only)
+        // Primary strip: capture group extracts the content between fences precisely
         const codeBlockMatch = jsonText.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
         if (codeBlockMatch) {
             jsonText = codeBlockMatch[1].trim();
+        } else {
+            // Secondary strip: belt-and-suspenders for edge cases where Groq wraps
+            // without a trailing newline before the closing fence
+            jsonText = jsonText.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
         }
 
         // CRITICAL: Reject if contains JSX tags (React components)
@@ -164,7 +181,7 @@ export class AIClient {
             throw new Error('AI response validation failed: HTML tags detected (expected JSON only)');
         }
 
-        // CRITICAL: Reject if contains non-JSON code fences
+        // CRITICAL: Reject non-JSON code fences
         if (/```(?!json)[\w-]+/.test(responseText)) {
             throw new Error('AI response validation failed: Non-JSON code blocks detected (expected JSON only)');
         }
@@ -186,147 +203,134 @@ export class AIClient {
     }
 
     /**
-     * Makes LLM API request with retry logic
+     * Makes a Groq API request (OpenAI-compatible) with retry logic.
+     * Uses native fetch — no external HTTP library required.
+     *
      * @private
-     * @param {Object} prompt - Structured prompt object
+     * @param {Object} prompt   - Structured prompt object { system, user }
      * @param {number} [attempt=1] - Current attempt number
-     * @returns {Promise<string>} AI response text
+     * @returns {Promise<string>} AI response text (content field)
      * @throws {Error} If all retries fail
      */
     async _makeRequest(prompt, attempt = 1) {
         if (!this.apiKey) {
-            throw new Error('LLM_API_KEY not configured');
+            throw new Error('GROQ_API_KEY not configured');
         }
 
+        const requestBody = {
+            model: this.model,
+            messages: [
+                { role: 'system', content: prompt.system },
+                { role: 'user', content: prompt.user },
+            ],
+            temperature: 0.2,          // Low temperature to preserve planning stability
+            // Note: response_format is NOT used — mixtral-8x7b-32768 does not support it.
+            // JSON output is enforced via the system prompt's explicit JSON-only constraint.
+        };
+
+        // AbortController for timeout enforcement
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+        let response;
         try {
-            // Build request config based on provider
-            let requestBody, headers;
-
-            if (this.provider === 'gemini') {
-                // Gemini API format
-                requestBody = {
-                    contents: [
-                        {
-                            parts: [
-                                { text: `${prompt.system}\n\n${prompt.user}` }
-                            ]
-                        }
-                    ],
-                    generationConfig: {
-                        temperature: 0.7,
-                        maxOutputTokens: 2000
-                    }
-                };
-                headers = {
+            response = await fetch(this.apiUrl, {
+                method: 'POST',
+                headers: {
                     'Content-Type': 'application/json',
-                    'x-goog-api-key': this.apiKey
-                };
-            } else {
-                // OpenAI API format
-                requestBody = {
-                    model: this.model,
-                    messages: [
-                        { role: 'system', content: prompt.system },
-                        { role: 'user', content: prompt.user },
-                    ],
-                    temperature: 0.7,
-                    max_tokens: 2000,
-                    response_format: { type: 'json_object' }
-                };
-                headers = {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${this.apiKey}`
-                };
-            }
+                    Authorization: `Bearer ${this.apiKey}`,
+                },
+                body: JSON.stringify(requestBody),
+                signal: controller.signal,
+            });
+        } catch (fetchError) {
+            clearTimeout(timeoutId);
 
-            const response = await axios.post(
-                this.apiUrl,
-                requestBody,
-                {
-                    timeout: this.timeout,
-                    headers
-                }
-            );
-
-            // Track token usage (format differs by provider)
-            if (this.provider === 'gemini') {
-                const usage = response.data.usageMetadata;
-                if (usage) {
-                    console.log(`   Tokens used: ${usage.totalTokenCount || 0} (prompt: ${usage.promptTokenCount || 0}, completion: ${usage.candidatesTokenCount || 0})`);
-                }
-            } else {
-                const usage = response.data.usage;
-                if (usage) {
-                    console.log(`   Tokens used: ${usage.total_tokens} (prompt: ${usage.prompt_tokens}, completion: ${usage.completion_tokens})`);
-                }
-            }
-
-            // Extract response text (format differs by provider)
-            let content;
-            if (this.provider === 'gemini') {
-                content = response.data.candidates?.[0]?.content?.parts?.[0]?.text;
-            } else {
-                content = response.data.choices?.[0]?.message?.content;
-            }
-
-            if (!content) {
-                throw new Error('Empty response from LLM API');
-            }
-
-            return content;
-        } catch (error) {
-            // Check if should retry
-            const shouldRetry =
-                attempt < this.maxRetries &&
-                (error.code === 'ECONNABORTED' || // Timeout
-                    error.code === 'ETIMEDOUT' ||
-                    error.response?.status === 429 || // Rate limit
-                    error.response?.status === 500 || // Server error
-                    error.response?.status === 503); // Service unavailable
+            // Network-level error or abort (timeout)
+            const isTimeout = fetchError.name === 'AbortError';
+            const shouldRetry = attempt < this.maxRetries && isTimeout;
 
             if (shouldRetry) {
-                // Exponential backoff
                 const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
                 console.log(`   Retry ${attempt}/${this.maxRetries} after ${delay}ms...`);
                 await this._sleep(delay);
                 return this._makeRequest(prompt, attempt + 1);
             }
 
-            // No more retries - throw error
-            const errorMessage = error.response?.data?.error?.message || error.message;
-            throw new Error(`LLM API request failed: ${errorMessage}`);
+            throw new Error(`LLM API request failed: ${isTimeout ? 'Request timed out' : fetchError.message}`);
         }
+
+        clearTimeout(timeoutId);
+
+        // Handle HTTP-level errors
+        if (!response.ok) {
+            const status = response.status;
+            const shouldRetry =
+                attempt < this.maxRetries &&
+                (status === 429 || status === 500 || status === 503);
+
+            if (shouldRetry) {
+                const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+                console.log(`   Retry ${attempt}/${this.maxRetries} after ${delay}ms (HTTP ${status})...`);
+                await this._sleep(delay);
+                return this._makeRequest(prompt, attempt + 1);
+            }
+
+            // Wrap provider error — do NOT leak raw error body
+            throw new Error(`LLM API request failed: HTTP ${status}`);
+        }
+
+        let data;
+        try {
+            data = await response.json();
+        } catch {
+            throw new Error('LLM API request failed: Invalid JSON in provider response');
+        }
+
+        // Log token usage
+        const usage = data.usage;
+        if (usage) {
+            console.log(
+                `   Tokens used: ${usage.total_tokens} ` +
+                `(prompt: ${usage.prompt_tokens}, completion: ${usage.completion_tokens})`
+            );
+        }
+
+        // Extract content from OpenAI-compatible response shape
+        const content = data.choices?.[0]?.message?.content;
+        if (!content) {
+            throw new Error('Empty response from Groq API');
+        }
+
+        return content;
     }
 
     /**
-     * Generates a fallback default plan when AI is unavailable
+     * Generates a fallback default plan when AI is unavailable.
      * @private
      * @param {Object} targetAnalysis - WebPageAnalysis object
      * @returns {Object} Default AIRedesignPlan
      */
     _getDefaultPlan(targetAnalysis) {
-        // Extract section types in original order
         const sectionTypes = targetAnalysis.sections.map((s) => s.type);
 
-        // Define standard section ordering
-        const standardOrder = ['navigation', 'hero', 'features', 'benefits', 'courses', 'testimonials', 'pricing', 'faq', 'cta', 'footer'];
+        const standardOrder = [
+            'navigation', 'hero', 'features', 'benefits', 'courses',
+            'testimonials', 'pricing', 'faq', 'cta', 'footer',
+        ];
 
-        // Sort sections by standard order, keeping existing sections
         const orderedSections = [];
         for (const type of standardOrder) {
             if (sectionTypes.includes(type)) {
                 orderedSections.push(type);
             }
         }
-
-        // Add any remaining sections not in standard order
         for (const type of sectionTypes) {
             if (!orderedSections.includes(type)) {
                 orderedSections.push(type);
             }
         }
 
-        // Create default layout variants.
         // CRITICAL: variant strings MUST match BACKEND_TEMPLATE_REGISTRY exactly
         // so the fallback plan can pass validateVariant() in CodeGenerator.
         const layoutVariants = {
@@ -340,14 +344,13 @@ export class AIClient {
             cta: 'gradient',
         };
 
-        // Create component mappings
         const componentMappings = targetAnalysis.sections.map((section) => ({
             sectionType: section.type,
             templateId: `${section.type}-template`,
             variant: layoutVariants[section.type] || 'default',
         }));
 
-        return {
+        const plan = {
             sectionOrdering: orderedSections,
             layoutVariants,
             contentTone: 'professional and approachable',
@@ -356,10 +359,13 @@ export class AIClient {
             redundantSections: [],
             componentMappings,
         };
+
+        // Always validate fallback plan against schema to catch future schema drift
+        return validateAIRedesignPlan(plan);
     }
 
     /**
-     * Sleep utility for retry delays
+     * Sleep utility for retry delays.
      * @private
      * @param {number} ms - Milliseconds to sleep
      * @returns {Promise<void>}

@@ -101,7 +101,7 @@ function Analysis() {
     // If the user refreshed or navigated directly to /analysis without first
     // going through the generation form, redirect them back to /generate.
     useEffect(() => {
-        if (targetAnalysis === null && stage !== 'analyzing') {
+        if (targetAnalysis === null && stage !== 'analyzing' && stage !== 'analyzed') {
             navigate('/generate', { replace: true });
         }
     }, [targetAnalysis, stage, navigate]);
@@ -154,7 +154,9 @@ function Analysis() {
         }
     }
 
-    // ── Render: spinner while analyzing ───────────────────────────────────
+    // ── Render: spinner while analyzing (before ANALYZE_SUCCESS) ──────────
+    // Once ANALYZE_SUCCESS fires, stage advances to 'analyzed' and we fall
+    // through to the full analysis summary below.
     if (stage === 'analyzing') {
         return (
             <Section>

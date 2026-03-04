@@ -265,16 +265,16 @@ export class ContentAnalyzer {
 
             const semanticIssues = [];
             if ($main.length === 0) {
-                semanticIssues.push('No <main> element found');
+                semanticIssues.push('No main landmark element found');
             }
             if ($header.length === 0 && $('body [class*="header"], body [id*="header"]').length > 0) {
-                semanticIssues.push('Header area not using <header> element');
+                semanticIssues.push('Header area not using semantic header element');
             }
             if ($footer.length === 0 && $('body [class*="footer"], body [id*="footer"]').length > 0) {
-                semanticIssues.push('Footer area not using <footer> element');
+                semanticIssues.push('Footer area not using semantic footer element');
             }
             if ($nav.length === 0 && $('body [class*="nav"], body [id*="nav"]').length > 0) {
-                semanticIssues.push('Navigation not using <nav> element');
+                semanticIssues.push('Navigation not using semantic nav element');
             }
 
             if (semanticIssues.length > 0) {

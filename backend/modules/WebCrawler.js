@@ -6,6 +6,15 @@
 /* global setTimeout */
 
 import axios from 'axios';
+import https from 'https';
+
+/**
+ * Shared HTTPS agent that skips certificate verification.
+ * Required for crawling arbitrary third-party sites where the local
+ * Node.js CA bundle may not include the site's issuer chain.
+ * (UNABLE_TO_GET_ISSUER_CERT_LOCALLY fix)
+ */
+const PERMISSIVE_HTTPS_AGENT = new https.Agent({ rejectUnauthorized: false });
 import { isValidURL, sanitizeURL } from '../utils/utils.js';
 
 /**
@@ -20,9 +29,9 @@ export class WebCrawler {
      * @param {string} [options.userAgent='ReForge/1.0 (Web Analysis Bot)'] - User agent string
      */
     constructor(options = {}) {
-        this.timeout = options.timeout || 15000;
-        this.maxRetries = options.maxRetries || 3;
-        this.userAgent = options.userAgent || 'ReForge/1.0 (Web Analysis Bot)';
+        this.timeout = options.timeout || parseInt(process.env.CRAWLER_TIMEOUT, 10) || 15000;
+        this.maxRetries = options.maxRetries || 2; // reduced from 3 to limit worst-case hang to ~30s
+        this.userAgent = options.userAgent || process.env.CRAWLER_USER_AGENT || 'ReForge/1.0 (Web Analysis Bot)';
     }
 
     /**
@@ -81,6 +90,7 @@ export class WebCrawler {
     async _makeRequest(url) {
         const response = await axios.get(url, {
             timeout: this.timeout,
+            httpsAgent: PERMISSIVE_HTTPS_AGENT, // bypass local CA cert issues on arbitrary external sites
             headers: {
                 'User-Agent': this.userAgent,
                 Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',

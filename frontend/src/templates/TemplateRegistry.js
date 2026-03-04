@@ -120,6 +120,13 @@ export const TEMPLATE_REGISTRY = {
         variants: VARIANTS.Footer,
         requiredProps: ['logoText', 'linkGroups'],
     },
+
+    /** Catch-all — unclassified sections from Phase 5 ContentAnalyzer */
+    other: {
+        component: FeaturesSection,
+        variants: VARIANTS.FeaturesSection,
+        requiredProps: [],
+    },
 };
 
 export default TEMPLATE_REGISTRY;

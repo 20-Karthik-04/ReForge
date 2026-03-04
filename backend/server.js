@@ -110,7 +110,7 @@ if (process.env.NODE_ENV !== 'test') {
     app.listen(PORT, () => {
         console.log(`✓ ReForge API server running on http://localhost:${PORT}`);
         console.log(`  NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
-        console.log(`  LLM provider: ${process.env.LLM_PROVIDER || 'openai'}`);
+        console.log(`  LLM provider: groq`);
     });
 }
 

@@ -323,9 +323,9 @@ async function testAIClientIntegration() {
 
     const client = new AIClient();
 
-    if (!client.apiKey || client.apiKey === 'your_api_key_here') {
-        console.log('⚠️  LLM_API_KEY not configured - skipping live API test');
-        console.log('   To test with real API, set LLM_API_KEY in .env file');
+    if (!client.apiKey || client.apiKey === 'your_groq_api_key_here') {
+        console.log('⚠️  GROQ_API_KEY not configured - skipping live API test');
+        console.log('   To test with real API, set GROQ_API_KEY in .env file');
         console.log('');
         return true; // Not a failure, just skipped
     }

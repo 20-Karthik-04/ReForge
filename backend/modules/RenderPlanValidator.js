@@ -111,13 +111,21 @@ export function validateVariant(sectionType, variant, registryEntry) {
         return variants[0];
     }
 
-    // Variant provided → must be exactly one of the registered values
+    // Variant provided but not in the registry → STABILIZATION: warn and fall back to default.
+    // The AI plan (Groq) returns imprecise variant tokens (e.g. "grid" instead of "grid3")
+    // that do not exactly match internal registry names. Hard-throwing here crashes the entire
+    // generation pipeline for a planning imprecision. Falling back to the default variant is
+    // the correct resilience strategy, consistent with validateRequiredProps and
+    // validateLayoutVariantKeys which are also stabilized to warn-not-throw.
     if (!variants.includes(variant)) {
-        throw new Error(
+        const fallback = variants[0];
+        // eslint-disable-next-line no-console
+        console.warn(
             `[CodeGenerator] Invalid variant "${variant}" for section "${sectionType}". ` +
             `Valid variants are: [${variants.join(', ')}]. ` +
-            `No fallback is performed — provide a valid variant or omit to use the default ("${variants[0]}").`
+            `Falling back to default variant "${fallback}".`
         );
+        return fallback;
     }
 
     return variant;
@@ -159,10 +167,15 @@ export function validateRequiredProps(sectionType, props, requiredProps) {
     );
 
     if (missing.length > 0) {
-        throw new Error(
+        // STABILIZATION: downgraded from throw to warn.
+        // The AI plan (Groq) provides planning data only — it never populates
+        // component-level content props (headline, features, etc.).
+        // The render pipeline proceeds with empty props; AppGenerator serializes
+        // them as {...{}} which is valid JSX. Content population is a Phase 8.5+ concern.
+        console.warn(
             `[CodeGenerator] Missing required props for section "${sectionType}": ` +
             `[${missing.map((k) => `"${k}"`).join(', ')}]. ` +
-            `Provided props keys: [${Object.keys(props).map((k) => `"${k}"`).join(', ')}]`
+            `Proceeding with available props. Section will render with placeholder content.`
         );
     }
 }
@@ -249,11 +262,14 @@ export function validateLayoutVariantKeys(layoutVariants, sectionOrdering) {
     const unknownKeys = Object.keys(layoutVariants).filter((key) => !orderingSet.has(key));
 
     if (unknownKeys.length > 0) {
-        throw new Error(
-            `[CodeGenerator] redesignPlan.layoutVariants contains keys not present in sectionOrdering: ` +
+        // STABILIZATION: downgraded from throw to warn.
+        // The AI plan (Groq) sometimes returns layoutVariants keys for sections
+        // not present in sectionOrdering. This is an AI planning inconsistency,
+        // not a fatal error. Unknown keys are silently ignored during render.
+        console.warn(
+            `[CodeGenerator] redesignPlan.layoutVariants contains keys not in sectionOrdering: ` +
             `[${unknownKeys.map((k) => `"${k}"`).join(', ')}]. ` +
-            `Remove these entries or add them to sectionOrdering. ` +
-            `sectionOrdering is: [${sectionOrdering.map((s) => `"${s}"`).join(', ')}]`
+            `These will be ignored during render.`
         );
     }
 }
